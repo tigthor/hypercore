@@ -108,6 +108,10 @@ test('basic replication stats', async function (t) {
   t.is(aStats.wireExtension.tx, 0, 'wireExtension init 0')
   t.is(aStats.wireCancel.rx, 0, 'wireCancel init 0')
   t.is(aStats.wireCancel.tx, 0, 'wireCancel init 0')
+  t.is(aStats.wireCodedRequest.rx, 0, 'wireCodedRequest init 0')
+  t.is(aStats.wireCodedRequest.tx, 0, 'wireCodedRequest init 0')
+  t.is(aStats.wireCodedData.rx, 0, 'wireCodedData init 0')
+  t.is(aStats.wireCodedData.tx, 0, 'wireCodedData init 0')
   t.is(aStats.hotswaps, 0, 'hotswaps init 0')
   t.is(aStats.invalidData, 0, 'invalid data init 0')
   t.is(aStats.invalidRequests, 0, 'invalid requests init 0')
@@ -115,7 +119,7 @@ test('basic replication stats', async function (t) {
   t.is(aStats.notAvailableBackoffs, 0, 'notAvailableBackoffs init 0')
 
   const initStatsLength = [...Object.keys(aStats)].length
-  t.is(initStatsLength, 14, 'Expected amount of stats')
+  t.is(initStatsLength, 16, 'Expected amount of stats')
 
   replicate(a, b, t)
 

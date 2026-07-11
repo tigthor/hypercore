@@ -1360,6 +1360,8 @@ function initOnce(session, storage, key, opts) {
     pushOnly: !!opts.pushOnly,
     alwaysLatestBlock: !!opts.allowLatestBlock,
     inflightRange: opts.inflightRange,
+    coded: !!opts.coded,
+    codedGroup: opts.codedGroup,
     compat: opts.compat === true,
     force: opts.force,
     createIfMissing: opts.createIfMissing,
