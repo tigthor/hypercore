@@ -255,12 +255,82 @@ test('coded repair completes over a high-latency link', async function (t) {
 
   const deadline = Date.now() + 60000
   while (b.core.bitfield.get(k - 1) === false) {
-    if (Date.now() > deadline)
+    if (Date.now() > deadline) {
       throw new Error('coded repair did not complete over the latency link')
+    }
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
 
   t.is(peer.coded.filled, k, 'coded filled every block despite latency')
-  for (let i = 0; i < k; i++)
+  for (let i = 0; i < k; i++) {
     t.alike(await b.get(i), b4a.from(('slow-' + i + '-').padEnd(64, 's')), 'block ' + i)
+  }
+})
+
+test('an all-empty group resets instead of wedging the coded controller', async function (t) {
+  const k = 16
+  const a = await create(t, { coded: true })
+  for (let i = 0; i < k; i++) await a.append(b4a.alloc(0))
+  for (let i = 0; i < k; i++) await a.append(b4a.from(('after-' + i + '-').padEnd(64, 'e')))
+
+  const b = await create(t, a.key, { coded: true })
+  replicate(a, b, t)
+
+  await b.update({ wait: true })
+  await eventFlush()
+  const peer = b.core.replicator.peers[0]
+
+  // group 0 is all zero-length blocks - nothing to code, the controller must
+  // release it (a leaked group has no timer and blocks update() forever)
+  peer.coded.active = { start: 0, phase: 'leaves' }
+  await peer.coded._start(0)
+  t.is(peer.coded.active, null, 'the unusable group was released')
+
+  // and the controller is still usable for the next, non-empty group
+  peer.coded.active = { start: k, phase: 'leaves' }
+  await peer.coded._start(k)
+
+  const deadline = Date.now() + 30000
+  while (b.core.bitfield.get(2 * k - 1) === false) {
+    if (Date.now() > deadline) throw new Error('coded repair did not recover after the empty group')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+
+  t.is(peer.coded.filled, k, 'coded filled the whole next group')
+  for (let i = 0; i < k; i++) {
+    t.alike(await b.get(k + i), b4a.from(('after-' + i + '-').padEnd(64, 'e')), 'block ' + (k + i))
+  }
+})
+
+test('codedGroup above the served maximum is clamped, not silently broken', async function (t) {
+  const n = 80 // more than one max-size group, so an unclamped k would exceed the cap
+  const a = await create(t, { coded: true, codedGroup: 4096 })
+  for (let i = 0; i < n; i++) await a.append(b4a.from(('big-' + i + '-').padEnd(64, 'g')))
+
+  const b = await create(t, a.key, { coded: true, codedGroup: 4096 })
+  t.is(b.core.replicator.codedGroup, 64, 'oversized codedGroup clamped to the wire maximum')
+
+  const c = await create(t, { coded: true, codedGroup: 0 })
+  t.is(c.core.replicator.codedGroup, 1, 'zero codedGroup clamped up to 1')
+
+  replicate(a, b, t)
+  await b.update({ wait: true })
+  await eventFlush()
+  const peer = b.core.replicator.peers[0]
+
+  // an unclamped downloader would ask for k=80 and be refused by every
+  // conformant seeder; clamped, the first group is 64 blocks and fills
+  peer.coded.active = { start: 0, phase: 'leaves' }
+  await peer.coded._start(0)
+
+  const deadline = Date.now() + 30000
+  while (b.core.bitfield.get(63) === false) {
+    if (Date.now() > deadline) throw new Error('clamped coded group did not fill')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+
+  t.is(peer.coded.filled, 64, 'coded filled a full clamped group')
+  for (let i = 0; i < 64; i++) {
+    t.alike(await b.get(i), b4a.from(('big-' + i + '-').padEnd(64, 'g')), 'block ' + i)
+  }
 })
