@@ -15,6 +15,7 @@ async function runTests() {
   await import('./clear.js') // todo: replace Info.bytesUsed API
   // await import('./compat.js') // todo: how to test compat?
   await import('./conflicts.js')
+  await import('./coded.js')
   await import('./core.js')
   await import('./encodings.js')
   await import('./encryption.js')
